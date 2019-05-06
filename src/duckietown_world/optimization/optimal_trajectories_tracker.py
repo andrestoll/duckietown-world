@@ -30,6 +30,22 @@ class OptimalTrajectoryTracker(metaclass=ABCMeta):
         :rtype: Dict[str, Dict[str, float]]
         """
 
+    def assert_valid_rule(self, rules):
+        valid_rules = ("Survival time", "Deviation from center line","Deviation from lane direction", \
+                       "Drivable areas", "Distance", "Lane distance", "Consecutive lane distance")
+        for rule in rules:
+            if rule not in valid_rules:
+                raise ValueError(f'{rule} is not valid.')
+
+
+def is_better(rule: str, x, y):
+    increasing = ("Survival time", "Drivable areas", "Distance", "Lane distance", "Consecutive lane distance")
+    decreasing = ("Deviation from center line", "Deviation from lane direction")
+    if rule in increasing:
+        return x > y
+    if rule in decreasing:
+        return x < y
+
 
 class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
     """
@@ -40,12 +56,14 @@ class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
     """
     trajs_tracked: Dict[str, Dict[str, float]]
     rules: List[str]
+    title: str
     # TODO change input type of rules, maybe List[Rule]
     # TODO input of slack variables
 
     def __init__(self, rules):
         self.trajs_tracked = dict()
         self.rules = rules
+        self.title = 'Lexicographic Semiorder'
         # TODO assert if input to rules is valid
 
     def digest_traj(self, egoname, scores):
@@ -83,7 +101,7 @@ class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
             self.trajs_tracked = {k: v for k, v in self.trajs_tracked.items() if k not in filter_index}
         self.trajs_tracked[egoname] = scores
 
-    def __discardable(self, x, y, rulex):
+    def __discardable(self, x, y, current_rule):
         """
         Checks whether a trajectory can be discarded, i.e. it will never be optimal.
         A trajectory X will never be optimal if there exists another trajectory Y for which
@@ -93,12 +111,12 @@ class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
         :param x: scores of trajectory to be possibly discarded
         :type x: Dict
         :param y: scores of trajectory to possibly discards x
-        :param rulex:
+        :param current_rule:
         :return:
         """
         for rule in self.rules:
             if x[rule] > y[rule]:
-                if rulex == rule:
+                if current_rule == rule:
                     return True
             else:
                 return False
@@ -123,11 +141,15 @@ class LexicographicTracker(OptimalTrajectoryTracker):
     """
     optimal_trajs: Dict[str, Dict[str, float]]
     rules: List[str]
+    title: str
     # TODO change input type of rules
 
     def __init__(self, rules):
         self.optimal_trajs = dict()
+        self.assert_valid_rule(rules)
         self.rules = rules
+        self.title = 'Lexicographic Order'
+
         # TODO assert if input to rules is valid
 
     def digest_traj(self, egoname, scores):
@@ -142,9 +164,9 @@ class LexicographicTracker(OptimalTrajectoryTracker):
                 item_scores = self.optimal_trajs[item]
                 item_score = item_scores[rule]
                 # TODO implement for max as well
-                if item_score < input_traj_score:
+                if is_better(rule, item_score, input_traj_score):
                     return
-                elif item_score > input_traj_score:
+                elif is_better(rule, input_traj_score, item_score):
                     self.optimal_trajs.clear()
                     break
         self.optimal_trajs[egoname] = scores
@@ -160,11 +182,13 @@ class ProductOrderTracker(OptimalTrajectoryTracker):
     """
     optimal_trajs: Dict[str, Dict[str, float]]
     rules: List[str]
+    title: str
     # TODO change input type of rules
 
     def __init__(self, rules):
         self.optimal_trajs = dict()
         self.rules = rules
+        self.title = 'Product Order'
         # TODO assert if input to rules is valid
 
     def digest_traj(self, egoname, scores):

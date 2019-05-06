@@ -714,6 +714,7 @@ def draw_axes(drawing, g, L=0.1, stroke_width=0.01, klass='axes'):
     g.add(g2)
 
 
+
 @memoized_reset
 def get_jpeg_bytes(fn):
     from PIL import Image

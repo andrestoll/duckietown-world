@@ -10,6 +10,7 @@ from duckietown_world.seqs.tsequence import SampledSequenceBuilder
 from duckietown_world.svg_drawing.misc import TimeseriesPlot
 from duckietown_world.world_duckietown.pwm_dynamics import get_DB18_nominal
 from duckietown_world.world_duckietown.types import TSE2v, se2v
+from duckietown_world.world_duckietown.other_objects import TrajectoryBundle, Trajectory
 from duckietown_world.world_duckietown.utils import get_velocities_from_sequence
 from duckietown_world.rules import evaluate_rules, get_scores, RuleEvaluationResult
 from duckietown_world.optimization import LexicographicSemiorderTracker, \
@@ -22,8 +23,7 @@ def get_bundle(N: int, times: List[float]):
 
     d = 0.1
     b = 0.5
-    # TODO remove after testing
-    # np.random.RandomState(seed=0)
+
     for i in range(N):
         commands_ssb = SampledSequenceBuilder[PWMCommands]()
         for t in times:
@@ -48,6 +48,7 @@ def get_trajs_bundle(commands_bundle, q, v):
 @comptest
 def test_planning():
     # TODO work with delay
+    root = get_simple_map()
     parameters = get_DB18_nominal(delay=0)
 
     # initial configuration
@@ -60,21 +61,21 @@ def test_planning():
     q, v = q0, v0
 
     # number of candidate trajectories
-    N = 15
+    N = 2
     # planning horizon
     horizon = 2
     # planning abortion
-    stop = 8
-    steps_per_second = 10
+    stop = 6
+    steps_per_second = 4
 
-    times = list(np.linspace(0, stop, stop*steps_per_second))
+    times = list(np.linspace(0, stop, stop * (steps_per_second + 1)))
 
     executed_commands_ssb = SampledSequenceBuilder[PWMCommands]()
     # TODO resolve t
     for t in times:
         # get random commands bundle
         # print('Time is : ', t)
-        commands_bundle = get_bundle(N, list(np.linspace(t, t + horizon, horizon * steps_per_second)))
+        commands_bundle = get_bundle(N, list(np.linspace(t, t + horizon, horizon * (steps_per_second + 1))))
         # get random trajectories
         trajs_bundle = get_trajs_bundle(commands_bundle, q, v)
         # evaluate traj_s bundle, e.g get optimum id
@@ -83,6 +84,19 @@ def test_planning():
         # TODO resolve id
         opt_items = optimum.popitem()
         opt_id = opt_items[0]
+        # TODO resolve hard coding
+        # t
+        transform = SE2Transform.identity()
+        ground_truth_ssb = SampledSequenceBuilder[SE2Transform]()
+        ground_truth_ssb.add(t, transform)
+        ground_truth = ground_truth_ssb.as_sequence()
+        if t != times[-1]:
+            for k, traj in trajs_bundle.items():
+                if k == opt_id:
+                    root.set_object(f'traj{k} at {t}', Trajectory(traj, color="red"), ground_truth=ground_truth)
+                else:
+                    root.set_object(f'traj{k} at {t}', Trajectory(traj, color="yellow"), ground_truth=ground_truth)
+
         commands_to_execute = commands_bundle[opt_id]
         # TODO shorten below
         pwm_commands_to_execute = commands_to_execute.values
@@ -102,10 +116,10 @@ def test_planning():
 
     executed_commands = executed_commands_ssb.as_sequence()
     executed_traj = integrate_dynamics2(parameters, q0, v0, executed_commands)
-    print(executed_traj)
+    # print(executed_traj)
     # visualize
     outdir = os.path.join(get_comptests_output_dir(), 'together')
-    visualize(executed_commands, executed_traj, outdir)
+    visualize(root, executed_commands, executed_traj, outdir)
 
 
 def get_current_pose_and_velocity(commands_ssb, q, v):
@@ -142,15 +156,14 @@ def evaluate_trajs(commands_bundle, trajs_bundle):
     return optimum
 
 
-def visualize(commands, traj, outdir):
-    root = get_simple_map()
+def visualize(root, commands, traj_executed, outdir):
     timeseries = {}
 
-    ground_truth = traj.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
+    ground_truth = traj_executed.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
 
     ego_name = 'Planned Trajectory'
     root.set_object(ego_name, DB18(), ground_truth=ground_truth)
-    poses = traj.transform_values(lambda t: t[0])
+    poses = traj_executed.transform_values(lambda t: t[0])
 
     velocities = get_velocities_from_sequence(poses)
     # TODO what's the difference with below
@@ -159,7 +172,7 @@ def visualize(commands, traj, outdir):
     linear = velocities.transform_values(linear_from_se2)
     angular = velocities.transform_values(angular_from_se2)
 
-    poses_sequence = traj.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
+    poses_sequence = traj_executed.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
     interval = SampledSequence.from_iterator(enumerate(commands.timestamps))
     evaluated = evaluate_rules(poses_sequence=poses_sequence, interval=interval, world=root, ego_name=ego_name)
 
@@ -208,7 +221,7 @@ def get_simple_map():
 
     import yaml
 
-    map_data = yaml.load(map_data_yaml)
+    map_data = yaml.load(map_data_yaml, Loader=yaml.SafeLoader)
 
     root = construct_map(map_data)
     return root

@@ -12,7 +12,7 @@ from duckietown_world.world_duckietown.pwm_dynamics import get_DB18_nominal
 from duckietown_world.world_duckietown.types import TSE2v, se2v
 from duckietown_world.world_duckietown.utils import get_velocities_from_sequence
 from duckietown_world.rules import evaluate_rules, get_scores, RuleEvaluationResult
-from duckietown_world.optimization import LexicographicSemiorderTracker, \
+from duckietown_world.optimization import OptimalTrajectoryTracker, LexicographicSemiorderTracker, \
     LexicographicTracker, ProductOrderTracker
 
 
@@ -64,7 +64,8 @@ def visualize(commands_bundle, trajs_bundle, outdir):
     root = get_simple_map()
     timeseries = {}
 
-    rules_list = ['Deviation from center line', 'Drivable areas']
+    # rules_list = ['Deviation from center line', 'Drivable areas']
+    rules_list = ["Distance", "Deviation from center line"]
     opt_trajs = get_best_trajs(commands_bundle, trajs_bundle, rules_list)
 
     for id_try, commands in commands_bundle.items():
@@ -77,6 +78,7 @@ def visualize(commands_bundle, trajs_bundle, outdir):
             root.set_object(ego_name, DB18(), ground_truth=ground_truth)
         else:
             root.set_object(ego_name, DB19(), ground_truth=ground_truth)
+
         poses = traj.transform_values(lambda t: t[0])
         velocities = get_velocities_from_sequence(poses)
         # TODO what's the difference with below
@@ -121,16 +123,43 @@ def get_best_trajs(commands_bundle, trajs_bundle, rules_list):
         evaluated = evaluate_rules(poses_sequence=poses_sequence, interval=interval, world=root, ego_name=ego_name)
         scores = get_scores(evaluated)
         optimal_traj_tracker.digest_traj(ego_name, scores)
+    make_html_table(optimal_traj_tracker)
     return optimal_traj_tracker.get_optimal_trajs()
 
 
-def display_optima(optimal_traj_tracker):
-    optima = optimal_traj_tracker.get_optimal_trajs()
-    print('Optimal Trajectories for ', type(optimal_traj_tracker), ':')
-    for item in optima:
-        print(item)
+# def display_optima(optimal_traj_tracker: OptimalTrajectoryTracker):
+#     optima = optimal_traj_tracker.get_optimal_trajs()
+#     print('Optimal Trajectories for ', type(optimal_traj_tracker), ':')
+#     for item in optima:
+#         print(item)
+#         for rule in optimal_traj_tracker.rules:
+#             print(rule, '=', optima[item][rule])
+
+
+def make_html_table(optimal_traj_tracker: OptimalTrajectoryTracker):
+
+    strTable = "<html><table><tr><th>Duckiebot</th>"
+
+    opt_trajs = optimal_traj_tracker.get_optimal_trajs()
+    for rule in optimal_traj_tracker.rules:
+        strRW = '<th>' + rule + '</th>'
+        strTable = strTable + strRW
+
+    strTable = strTable + '</tr>'
+
+    for duckie in opt_trajs.keys():
+        strRW = "<tr><td>" + duckie + "</td>"
         for rule in optimal_traj_tracker.rules:
-            print(rule, '=', optima[item][rule])
+            strRW = strRW + '<td>' + str(opt_trajs[duckie][rule]) + "</td>"
+        strRW = strRW + '</tr>'
+        strTable = strTable + strRW
+
+    strTable = strTable + "</table></html>"
+
+    hs = open("scores.html", 'w')
+    hs.write(strTable)
+
+    print(strTable)
 
 
 def get_simple_map():
