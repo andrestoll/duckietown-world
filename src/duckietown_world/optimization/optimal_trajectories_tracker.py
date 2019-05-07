@@ -30,7 +30,8 @@ class OptimalTrajectoryTracker(metaclass=ABCMeta):
         :rtype: Dict[str, Dict[str, float]]
         """
 
-    def assert_valid_rule(self, rules):
+
+def assert_valid_rule(rules):
         valid_rules = ("Survival time", "Deviation from center line","Deviation from lane direction", \
                        "Drivable areas", "Distance", "Lane distance", "Consecutive lane distance")
         for rule in rules:
@@ -146,7 +147,7 @@ class LexicographicTracker(OptimalTrajectoryTracker):
 
     def __init__(self, rules):
         self.optimal_trajs = dict()
-        self.assert_valid_rule(rules)
+        assert_valid_rule(rules)
         self.rules = rules
         self.title = 'Lexicographic Order'
 

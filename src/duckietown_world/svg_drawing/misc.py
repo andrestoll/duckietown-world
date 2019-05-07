@@ -129,7 +129,7 @@ def recurive_draw_list(draw_list, prefix):
     return res
 
 
-def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
+def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None, scores=None,
                 timeseries=None, height_of_stored_images: Optional[int] = None) -> Sequence[str]:
     from duckietown_world.world_duckietown import get_sampling_points, ChooseTime
     images = images or {}
@@ -214,6 +214,9 @@ def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
             imagename2div[name].append(img)
 
     other = ""
+
+    if scores:
+        other = make_html_table(scores)
 
     # language=html
     visualize_controls = """\
@@ -666,14 +669,38 @@ body {{
 <script type='text/javascript'>
     showVal(0); 
 </script>
-
-{div_timeseries}
 {other}
+{div_timeseries}
 </body>
 </html>
     """.format(controls=str(controls), drawing=drawing_svg, obs_div=obs_div, other=other,
                div_timeseries=div_timeseries, visualize_controls=visualize_controls)
     return doc
+
+
+def make_html_table(scores_bundle):
+    valid_rules = ("Survival time", "Deviation from center line", "Deviation from lane direction", \
+                   "Drivable areas", "Distance", "Lane distance", "Consecutive lane distance")
+
+    string_output = "<html><table><tr><th>Duckiebot</th>"
+
+    for rule in valid_rules:
+        strRW = '<th>' + rule + '</th>'
+        string_output = string_output + strRW
+
+    string_output = string_output + '</tr>'
+
+    precision = 3
+    for duckie in scores_bundle.keys():
+        strRW = "<tr><td>" + duckie + "</td>"
+        for rule in valid_rules:
+            strRW = strRW + '<td>' + "{:.{}f}".format(scores_bundle[duckie][rule], precision) + "</td>"
+        strRW = strRW + '</tr>'
+        string_output = string_output + strRW
+
+    string_output = string_output + "</table></html>"
+
+    return string_output
 
 
 def mime_from_fn(fn):

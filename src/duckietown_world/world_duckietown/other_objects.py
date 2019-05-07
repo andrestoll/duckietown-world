@@ -26,7 +26,6 @@ __all__ = [
     'SignDoNotEnter',
     'SignParking',
     'SignPedestrian',
-    'TrajectoryBundle',
     'Trajectory',
     'Bus',
     'House',
@@ -64,30 +63,6 @@ class Duckie(PlacedObject):
 
 class Decoration(PlacedObject):
     pass
-
-
-class TrajectoryBundle(PlacedObject):
-    def __init__(self, trajs_bundle,  *args, **kwargs):
-        PlacedObject.__init__(self, *args, **kwargs)
-        self.trajs_bundle = trajs_bundle
-
-    def draw_svg(self, drawing, g):
-
-        for traj, ss in self.trajs_bundle.items():
-            traj_times = ss.values
-            timestamps = ss.timestamps
-
-            for t in range(len(timestamps)-1):
-                time = timestamps[t]
-                time_after = timestamps[t+1]
-                start, _ = geo.translation_angle_from_SE2(ss.at(time)[0])
-                end, _ = geo.translation_angle_from_SE2(ss.at(time_after)[0])
-
-                line = drawing.line(start=(start[0], start[1]),
-                                    end=(end[0], end[1]),
-                                    stroke_width=0.02,
-                                    stroke="red")
-                g.add(line)
 
 
 class Trajectory(PlacedObject):

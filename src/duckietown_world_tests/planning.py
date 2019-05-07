@@ -10,7 +10,7 @@ from duckietown_world.seqs.tsequence import SampledSequenceBuilder
 from duckietown_world.svg_drawing.misc import TimeseriesPlot
 from duckietown_world.world_duckietown.pwm_dynamics import get_DB18_nominal
 from duckietown_world.world_duckietown.types import TSE2v, se2v
-from duckietown_world.world_duckietown.other_objects import TrajectoryBundle, Trajectory
+from duckietown_world.world_duckietown.other_objects import Trajectory
 from duckietown_world.world_duckietown.utils import get_velocities_from_sequence
 from duckietown_world.rules import evaluate_rules, get_scores, RuleEvaluationResult
 from duckietown_world.optimization import LexicographicSemiorderTracker, \
@@ -61,12 +61,12 @@ def test_planning():
     q, v = q0, v0
 
     # number of candidate trajectories
-    N = 2
+    N = 15
     # planning horizon
-    horizon = 2
+    horizon = 4
     # planning abortion
-    stop = 6
-    steps_per_second = 4
+    stop = 12
+    steps_per_second = 8
 
     times = list(np.linspace(0, stop, stop * (steps_per_second + 1)))
 

@@ -201,13 +201,13 @@ class InDrivableLane(Rule):
             try:
                 name2lpr = lane_pose_seq.at(timestamp)
             except UndefinedAtTime:
-                d = 1.0
+                d = 0.0
             else:
                 if name2lpr:
-                    d = 0.0
+                    d = 1.0
                 else:
                     # no lp
-                    d = 1.0
+                    d = 0.0
 
             values.append(d)
             timestamps.append(timestamp)

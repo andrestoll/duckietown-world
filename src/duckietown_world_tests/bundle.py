@@ -46,9 +46,9 @@ def test_bundle():
 
     q0 = geo.SE2_from_R2(init_pose)
     v0 = geo.se2_from_linear_angular(init_vel, 0)
-    N = 5
+    N = 2
 
-    commands_bundle = get_bundle(N, list(np.linspace(0, 4, 30)))
+    commands_bundle = get_bundle(N, list(np.linspace(0, 6, 30)))
     trajs_bundle = {}
 
     for id_try, commands in commands_bundle.items():
@@ -61,105 +61,89 @@ def test_bundle():
 
 
 def visualize(commands_bundle, trajs_bundle, outdir):
-    root = get_simple_map()
     timeseries = {}
+    root = get_simple_map()
 
-    # rules_list = ['Deviation from center line', 'Drivable areas']
     rules_list = ["Distance", "Deviation from center line"]
-    opt_trajs = get_best_trajs(commands_bundle, trajs_bundle, rules_list)
+    scores_bundle = get_scores_of_traj_bundle(timeseries, commands_bundle, trajs_bundle)
+    opt_trajs = get_best_trajs(scores_bundle, rules_list)
 
     for id_try, commands in commands_bundle.items():
         traj = trajs_bundle[id_try]
 
-        ground_truth = traj.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
         ego_name = f'Duckiebot{id_try}'
+        ground_truth = traj.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
 
         if ego_name in opt_trajs.keys():
             root.set_object(ego_name, DB18(), ground_truth=ground_truth)
         else:
             root.set_object(ego_name, DB19(), ground_truth=ground_truth)
 
-        poses = traj.transform_values(lambda t: t[0])
-        velocities = get_velocities_from_sequence(poses)
-        # TODO what's the difference with below
-        # v_test = traj.transform_values(lambda t: t[1])
-        linear = velocities.transform_values(linear_from_se2)
-        angular = velocities.transform_values(angular_from_se2)
-
-        # for key, rer in evaluated.items():
-        #     assert isinstance(rer, RuleEvaluationResult)
-        #
-        #     for km, evaluated_metric in rer.metrics.items():
-        #         sequences = {}
-        #         sequences[evaluated_metric.title] = evaluated_metric.cumulative
-        #         plots = TimeseriesPlot(f'{ego_name} - {evaluated_metric.title}', evaluated_metric.title, sequences)
-        #         timeseries[f'{ego_name} - {evaluated_metric.title}'] = plots
-
-        sequences = {}
-        sequences['motor_left'] = commands.transform_values(lambda _: _.motor_left)
-        sequences['motor_right'] = commands.transform_values(lambda _: _.motor_right)
-        plots = TimeseriesPlot(f'{id_try} - PWM commands', 'pwm_commands', sequences)
-        timeseries[f'{ego_name} - commands'] = plots
-
-        sequences = {}
-        sequences['linear_velocity'] = linear
-        sequences['angular_velocity'] = angular
-        plots = TimeseriesPlot(f'{id_try} - Velocities', 'velocities', sequences)
-        timeseries[f'{ego_name} - velocities'] = plots
-
-    draw_static(root, outdir, timeseries=timeseries)
+    draw_static(root, outdir, timeseries=timeseries, scores=scores_bundle)
 
 
-def get_best_trajs(commands_bundle, trajs_bundle, rules_list):
+def get_scores_of_traj_bundle(timeseries, commands_bundle, trajs_bundle):
     root = get_simple_map()
-    optimal_traj_tracker = LexicographicTracker(rules_list)
+    scores_of_traj_bundle = {}
+
     for id_try, commands in commands_bundle.items():
         traj = trajs_bundle[id_try]
+        poses = traj.transform_values(lambda t: t[0])
+
         ego_name = f'Duckiebot{id_try}'
         ground_truth = traj.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
+
         root.set_object(ego_name, DB18(), ground_truth=ground_truth)
+
         poses_sequence = traj.transform_values(lambda t: SE2Transform.from_SE2(t[0]))
         interval = SampledSequence.from_iterator(enumerate(commands.timestamps))
+
         evaluated = evaluate_rules(poses_sequence=poses_sequence, interval=interval, world=root, ego_name=ego_name)
+
+        update_timeseries(timeseries, ego_name, commands, poses, evaluated)
+
         scores = get_scores(evaluated)
+        scores_of_traj_bundle[ego_name] = scores
+
+    return scores_of_traj_bundle
+
+
+def update_timeseries(timeseries, ego_name, commands, poses, evaluated):
+    velocities = get_velocities_from_sequence(poses)
+    linear = velocities.transform_values(linear_from_se2)
+    angular = velocities.transform_values(angular_from_se2)
+    # TODO what's the difference with below
+    # v_test = traj.transform_values(lambda t: t[1])
+
+    for key, rer in evaluated.items():
+        assert isinstance(rer, RuleEvaluationResult)
+
+        for km, evaluated_metric in rer.metrics.items():
+            sequences = {}
+            sequences[evaluated_metric.title] = evaluated_metric.cumulative
+            plots = TimeseriesPlot(f'{ego_name} - {evaluated_metric.title}', evaluated_metric.title, sequences)
+            timeseries[f'{ego_name} - {evaluated_metric.title}'] = plots
+
+    sequences = {}
+    sequences['motor_left'] = commands.transform_values(lambda _: _.motor_left)
+    sequences['motor_right'] = commands.transform_values(lambda _: _.motor_right)
+    plots = TimeseriesPlot(f'{ego_name} - PWM commands', 'pwm_commands', sequences)
+    timeseries[f'{ego_name} - commands'] = plots
+
+    sequences = {}
+    sequences['linear_velocity'] = linear
+    sequences['angular_velocity'] = angular
+    plots = TimeseriesPlot(f'{ego_name} - Velocities', 'velocities', sequences)
+    timeseries[f'{ego_name} - velocities'] = plots
+
+
+def get_best_trajs(scores_bundle, rules_list):
+    optimal_traj_tracker = LexicographicTracker(rules_list)
+
+    for ego_name, scores in scores_bundle.items():
         optimal_traj_tracker.digest_traj(ego_name, scores)
-    make_html_table(optimal_traj_tracker)
+
     return optimal_traj_tracker.get_optimal_trajs()
-
-
-# def display_optima(optimal_traj_tracker: OptimalTrajectoryTracker):
-#     optima = optimal_traj_tracker.get_optimal_trajs()
-#     print('Optimal Trajectories for ', type(optimal_traj_tracker), ':')
-#     for item in optima:
-#         print(item)
-#         for rule in optimal_traj_tracker.rules:
-#             print(rule, '=', optima[item][rule])
-
-
-def make_html_table(optimal_traj_tracker: OptimalTrajectoryTracker):
-
-    strTable = "<html><table><tr><th>Duckiebot</th>"
-
-    opt_trajs = optimal_traj_tracker.get_optimal_trajs()
-    for rule in optimal_traj_tracker.rules:
-        strRW = '<th>' + rule + '</th>'
-        strTable = strTable + strRW
-
-    strTable = strTable + '</tr>'
-
-    for duckie in opt_trajs.keys():
-        strRW = "<tr><td>" + duckie + "</td>"
-        for rule in optimal_traj_tracker.rules:
-            strRW = strRW + '<td>' + str(opt_trajs[duckie][rule]) + "</td>"
-        strRW = strRW + '</tr>'
-        strTable = strTable + strRW
-
-    strTable = strTable + "</table></html>"
-
-    hs = open("scores.html", 'w')
-    hs.write(strTable)
-
-    print(strTable)
 
 
 def get_simple_map():
