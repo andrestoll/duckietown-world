@@ -1,7 +1,7 @@
 # coding=utf-8
 
 from duckietown_world import logger
-from duckietown_world.svg_drawing.misc import mime_from_fn, draw_axes
+from duckietown_world import mime_from_fn, draw_axes
 import geometry as geo
 
 from ..geo import PlacedObject

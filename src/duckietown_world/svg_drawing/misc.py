@@ -28,6 +28,7 @@ __all__ = [
     'draw_axes',
     'draw_children',
     'data_encoded_for_src',
+    'mime_from_fn',
 ]
 
 
@@ -643,7 +644,7 @@ def make_html_slider(drawing, keyframes, obs_div, other, div_timeseries, visuali
     # language=html
     doc = """\
 <html lang='en'>
-<head></head>
+<head><title>Lexicographic Semiordering of Trajectory Scores</title></head>
 <body>
 <style>
 /*svg {{ background-color: #eee;}}*/
@@ -681,8 +682,8 @@ body {{
 def make_html_table(scores_bundle):
     valid_rules = ("Survival time", "Deviation from center line", "Deviation from lane direction", \
                    "Drivable areas", "Distance", "Lane distance", "Consecutive lane distance")
-
-    string_output = "<html><table><tr><th>Duckiebot</th>"
+    string_preamble = "<p>The scores are lexicographically semiordered where the  </p>"
+    string_output = "<table><tr><th>Duckiebot</th>"
 
     for rule in valid_rules:
         strRW = '<th>' + rule + '</th>'
@@ -698,7 +699,7 @@ def make_html_table(scores_bundle):
         strRW = strRW + '</tr>'
         string_output = string_output + strRW
 
-    string_output = string_output + "</table></html>"
+    string_output = string_output + "</table>"
 
     return string_output
 

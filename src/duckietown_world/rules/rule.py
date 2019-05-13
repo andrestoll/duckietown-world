@@ -17,7 +17,6 @@ __all__ = [
     'RuleEvaluationResult',
     'Rule',
     'evaluate_rules',
-    'get_scores',
 ]
 
 
@@ -150,17 +149,6 @@ def evaluate_rules(poses_sequence,
         rule.evaluate(context, result)
         evaluated[name] = result
     return evaluated
-
-
-def get_scores(evaluated) -> Dict[str, float]:
-    scores = {}
-    for key, rer in evaluated.items():
-        assert isinstance(rer, RuleEvaluationResult)
-
-        for km, evaluated_metric in rer.metrics.items():
-            scores[evaluated_metric.title] = evaluated_metric.total
-
-    return scores
 
 
 def make_timeseries(evaluated) -> Dict[str, 'TimeseriesPlot']:

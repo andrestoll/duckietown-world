@@ -134,7 +134,7 @@ def get_current_pose_and_velocity(commands_ssb, q, v):
 def evaluate_trajs(commands_bundle, trajs_bundle):
     # TODO only use trajs_bundle
     # TODO make generic
-    rules_list = ['Deviation from center line', 'Drivable areas']
+    rules_list = ['Drivable areas']
     optimal_traj_tracker = LexicographicTracker(rules_list)
     root = get_simple_map()
 
