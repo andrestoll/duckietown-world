@@ -95,6 +95,7 @@ def integrate_dynamics(factory, q0, v0, dt, t_max, fixed_commands) -> SampledSeq
     t0 = 0
     c0 = q0, v0
     state = factory.initialize(c0=c0, t0=t0)
+    ssb1 = SampledSequenceBuilder[PWMCommands]()
     ssb = SampledSequenceBuilder[TSE2v]()
     ssb.add(t0, state.TSE2_from_state())
     n = int(t_max / dt)

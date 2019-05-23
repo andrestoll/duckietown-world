@@ -26,12 +26,12 @@ def get_random_commands_bundle(n: int, times: List[float]) -> Dict[str, SampledS
     d = 0.1
     b = 0.5
     # TODO remove after testing
-    np.random.RandomState(seed=0)
+    r = np.random.RandomState(1234)
     for i in range(n):
         commands_ssb = SampledSequenceBuilder[PWMCommands]()
         for t in times:
-            u_left = np.random.choice([-d + b, b, b + d])
-            u_right = np.random.choice([-d + b, b, b + d])
+            u_left = r.choice([-d + b, b, b + d])
+            u_right = r.choice([-d + b, b, b + d])
             u = PWMCommands(motor_left=u_left, motor_right=u_right)
             commands_ssb.add(t, u)
         commands = commands_ssb.as_sequence()
@@ -54,6 +54,7 @@ def get_random_trajs_bundle(factory: PlatformDynamicsFactory, n: int, times: Lis
     for id_try, commands in commands_bundle.items():
         seq = integrate_dynamics2(factory, q0, v0, commands)
         trajs_bundle[id_try] = seq
+        # TODO why SampledSequence[PWMCommands]
     return trajs_bundle, commands_bundle
 
 
@@ -74,5 +75,7 @@ def integrate_dynamics2(factory: PlatformDynamicsFactory, q0, v0, commands: Samp
     for it in iterate_with_dt(commands):
         ssb.add(it.t0, state.TSE2_from_state())
         state = state.integrate(it.dt, it.v0)
+
+    a = ssb.as_sequence()
 
     return ssb.as_sequence()

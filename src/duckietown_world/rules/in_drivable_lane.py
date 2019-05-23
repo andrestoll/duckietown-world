@@ -16,7 +16,6 @@ __all__ = [
     'DrivenLength',
     'DrivenLengthConsecutive',
     'SurvivalTime',
-
 ]
 
 
@@ -60,33 +59,46 @@ from typing import cast
 
 class SurvivalTime(Rule):
 
-    def precedes(self, x, y):
-        return x > y
-
     def evaluate(self, context: RuleEvaluationContext, result: RuleEvaluationResult):
+        interval = cast(SampledSequence, context.get_interval())
         lane_pose_seq = context.get_lane_pose_seq()
         if len(lane_pose_seq) < 1:
             raise ValueError(lane_pose_seq)
 
+        timestamps = []
+        values = []
+
+        for i, timestamp in interval:
+            try:
+                name2lpr = lane_pose_seq.at(timestamp)
+            except UndefinedAtTime:
+                d = 0.0
+            else:
+                if name2lpr:
+                    d = 1.0
+                else:
+                    # no lp
+                    d = 0.0
+
+            values.append(d)
+            timestamps.append(timestamp)
+
         title = "Survival time"
         description = "Length of the episode."
 
-        incremental = lane_pose_seq.transform_values(lambda _: 1.0)
-        cumulative = integrate(incremental)
-        total = cumulative.values[-1]
+        sequence = SampledSequence[float](timestamps, values)
+        if len(sequence) <= 1:
+            cumulative = 0
+            dtot = 0
+        else:
+            cumulative = integrate(sequence)
+            dtot = cumulative.values[-1]
 
-        result.set_metric(name=(),
-                          title=title,
-                          description=description,
-                          total=total,
-                          incremental=incremental,
-                          cumulative=cumulative)
+        result.set_metric(name=(), total=dtot, incremental=sequence,
+                          title=title, description=description, cumulative=cumulative)
 
 
 class DeviationFromCenterLine(Rule):
-
-    def precedes(self, x, y):
-        return x < y
 
     def evaluate(self, context: RuleEvaluationContext, result: RuleEvaluationResult):
 
@@ -136,9 +148,6 @@ class DeviationFromCenterLine(Rule):
 
 class DeviationHeading(Rule):
 
-    def precedes(self, x, y):
-        return x < y
-
     def evaluate(self, context: RuleEvaluationContext, result: RuleEvaluationResult):
 
         interval = cast(SampledSequence, context.get_interval())
@@ -187,9 +196,6 @@ class DeviationHeading(Rule):
 
 class InDrivableLane(Rule):
 
-    def precedes(self, x, y):
-        return x > y
-
     def evaluate(self, context: RuleEvaluationContext, result: RuleEvaluationResult):
         interval = cast(SampledSequence, context.get_interval())
         lane_pose_seq = context.get_lane_pose_seq()
@@ -203,7 +209,12 @@ class InDrivableLane(Rule):
             except UndefinedAtTime:
                 d = 0.0
             else:
-                if name2lpr:
+                for k, lpr in name2lpr.items():
+                    assert isinstance(lpr, GetLanePoseResult)
+                    lane_pose = lpr.lane_pose
+                    lateral_inside = lane_pose.lateral_inside
+
+                if lateral_inside:
                     d = 1.0
                 else:
                     # no lp

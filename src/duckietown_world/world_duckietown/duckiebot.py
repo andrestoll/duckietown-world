@@ -1,6 +1,6 @@
 # coding=utf-8
 from duckietown_world.geo import PlacedObject
-from duckietown_world.svg_drawing import draw_axes
+from duckietown_world.svg_drawing import draw_axes, draw_tags
 from .other_objects import Vehicle
 
 __all__ = [
@@ -12,13 +12,14 @@ __all__ = [
 
 class Duckiebot(Vehicle):
 
-    def __init__(self, width, length, height, color="red", *args, **kwargs):
+    def __init__(self, name, width, length, height, color="red", *args, **kwargs):
         PlacedObject.__init__(self, *args, **kwargs)
 
         self.width = width
         self.height = height
         self.length = length
         self.color = color
+        self.name = name
 
     def draw_svg(self, drawing, g):
         L, W = self.length, self.width
@@ -32,22 +33,22 @@ class Duckiebot(Vehicle):
         g.add(rect)
 
         draw_axes(drawing, g)
-        # print(g.tostring())
+        draw_tags(drawing, g, L, W, self.name)
 
 
 class DB18(Duckiebot):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name=None, *args, **kwargs):
         width = 0.13 # + 0.02
         length = 0.18
         height = 0.12
-        Duckiebot.__init__(self, width=width, length=length, height=height, *args, **kwargs)
+        Duckiebot.__init__(self, name=name, width=width, length=length, height=height, *args, **kwargs)
 
 
 class DB19(Duckiebot):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name=None, *args, **kwargs):
         width = 0.13 # + 0.02
         length = 0.18
         height = 0.12
         color = "yellow"
-        Duckiebot.__init__(self, width=width, length=length, height=height, color=color, *args, **kwargs)
+        Duckiebot.__init__(self, name=name, width=width, length=length, height=height, color=color, *args, **kwargs)
 

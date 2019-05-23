@@ -83,6 +83,8 @@ class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
     lexicographically evaluated and all solutions that are within some bound (also called the slack) of
     the absolute optimum are taken to the next step.
     """
+    # TODO make generic
+    # TODO merge semi and normal lexicographic order
     trajs_tracked: Dict[str, Dict[str, float]]
     rules_with_slack: Dict[str, float]
     title: str
@@ -94,7 +96,9 @@ class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
         assert_valid_rules(rules_with_slack.keys())
         self.rules_with_slack = rules_with_slack
         self.title = 'Lexicographic Semiorder'
-        # TODO assert if input to rules is valid
+
+    def add_collection(self, trajs_collection: Dict[str, Dict[str, float]]):
+        self.trajs_tracked = trajs_collection.copy()
 
     def digest_traj(self, egoname: str, scores: Dict[str, float]):
         if not self.trajs_tracked:
@@ -172,6 +176,12 @@ class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
                 print(item, ":", optimal_set[item][rule])
         return optimal_set
 
+    def pop_best(self):
+        best = self.get_optimal_trajs().copy()
+        for k in best.keys():
+            self.trajs_tracked.pop(k)
+        return best
+
 
 class LexicographicTracker(OptimalTrajectoryTracker):
     """
@@ -208,8 +218,29 @@ class LexicographicTracker(OptimalTrajectoryTracker):
                     break
         self.optimal_trajs[egoname] = scores
 
+    # TODO make abstract method
+    def add_collection(self, trajs_collection: Dict[str, Dict[str, float]]):
+        self.optimal_trajs = trajs_collection.copy()
+
     def get_optimal_trajs(self):
         return self.optimal_trajs
+
+    def pop_best(self):
+        optimal_set = self.optimal_trajs.copy()
+        for rule in self.rules:
+            if rule in self.decreasing:
+                optimal_score = min(optimal_set.values(), key=lambda x: x[rule])[rule]
+            else:
+                optimal_score = max(optimal_set.values(), key=lambda x: x[rule])[rule]
+            print("Optimal score for ", rule, optimal_score)
+            # TODO remove print statements
+            optimal_set = {k: v for k, v in optimal_set.items() if not strictly_preceedes(rule, optimal_score, v[rule])}
+            for item in optimal_set:
+                print(item, ":", optimal_set[item][rule])
+        for k in optimal_set.keys():
+            self.optimal_trajs.pop(k)
+
+        return optimal_set
 
 
 class ProductOrderTracker(OptimalTrajectoryTracker):
@@ -246,5 +277,14 @@ class ProductOrderTracker(OptimalTrajectoryTracker):
         self.optimal_trajs = {k: v for k, v in self.optimal_trajs.items() if k not in filter_index}
         self.optimal_trajs[egoname] = scores
 
+    def add_collection(self, trajs_collection: Dict[str, Dict[str, float]]):
+        self.optimal_trajs = trajs_collection.copy()
+
     def get_optimal_trajs(self):
         return self.optimal_trajs
+
+    def pop_best(self):
+        best = self.get_optimal_trajs().copy()
+        for k in best.keys():
+            self.optimal_trajs.pop(k)
+        return best

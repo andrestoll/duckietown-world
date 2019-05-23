@@ -20,12 +20,14 @@ from duckietown_world.geo import RectangularArea, get_extent_points, get_static_
 from duckietown_world.seqs import SampledSequence, UndefinedAtTime
 from duckietown_world.seqs.tsequence import Timestamp
 from duckietown_world.utils import memoized_reset
+from duckietown_world.optimization import LexicographicSemiorderTracker, LexicographicTracker, ProductOrderTracker
 
 __all__ = [
     'draw_recursive',
     'get_basic_upright2',
     'draw_static',
     'draw_axes',
+    'draw_tags',
     'draw_children',
     'data_encoded_for_src',
     'mime_from_fn',
@@ -217,7 +219,7 @@ def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
     other = ""
 
     if scores:
-        other = make_html_table(scores)
+        other = make_html_table2(scores)
 
     # language=html
     visualize_controls = """\
@@ -231,6 +233,7 @@ def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
             <input id='checkbox-static' type="checkbox"  onclick="hideshow(this);" checked>static data</input>
             <input id='checkbox-textures' type="checkbox"  onclick="hideshow(this);" checked>textures</input>
             <input id='checkbox-axes' type="checkbox"  onclick="hideshow(this);">axes</input>
+            <input id='checkbox-tags' type="checkbox"  onclick="hideshow(this);">tags</input>
             <br/>
             <input id='checkbox-lane_segments' type="checkbox"  onclick="hideshow(this);">map lane segments</input>
             (<input id='checkbox-lane_segments-control_points' type="checkbox"  onclick="hideshow(this);">control points</input>)</p>
@@ -255,6 +258,7 @@ def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
                     "checkbox-static": "g.static",
                     "checkbox-textures": "g.static .tile-textures",
                     "checkbox-axes": "g.axes",
+                    "checkbox-tags": "g.tags",
                     "checkbox-lane_segments": "g.static .LaneSegment",
                     "checkbox-lane_segments-control_points": " .control-point",
                     "checkbox-current_lane": "g.keyframe .LaneSegment",
@@ -579,8 +583,7 @@ def make_html_slider(drawing, keyframes, obs_div, other, div_timeseries, visuali
     #time-range {
     width: 50%%;
     }
-    #fixedui { 
-    position: fixed; 
+    #fixedui {  
     width: 100%%;
     height: 3em;
     background-color: white;
@@ -680,28 +683,81 @@ body {{
 
 
 def make_html_table(scores_bundle):
-    valid_rules = ("Survival time", "Deviation from center line", "Deviation from lane direction", \
-                   "Drivable areas", "Distance", "Lane distance", "Consecutive lane distance")
-    string_preamble = "<p>The scores are lexicographically semiordered where the  </p>"
-    string_output = "<table><tr><th>Duckiebot</th>"
+    # TODO rules_list as input
+    # generic for each tracker
+    rules_list = {"Survival time": 0.5, "Drivable areas": 0.5, "Deviation from center line": 0.1}
+    tracker = LexicographicSemiorderTracker(rules_list)
+    tracker.add_collection(scores_bundle)
+    string_preamble0 = f'<p>{len(scores_bundle.keys())} were randomly generated and evaluated. The optimal trajectories are dispalyed in red.</p>'
+    string_preamble = "<p>In order to determine the optimal trajectories, the scores of the trajectories were lexicographically semiordered where the following rules and thresholds were used:</p>"
+    rules_enum = '<ol>'
+    for k,v in rules_list.items():
+        entry = f'<li>{k} (threshold: {v})</li>'
+        rules_enum = rules_enum + entry
+    rules_enum = rules_enum + '</ol>'
+    string_output = '<table style="width:70%"><tr><th>Rank</th><th>Duckiebot</th>'
 
-    for rule in valid_rules:
+    for rule in rules_list.keys():
         strRW = '<th>' + rule + '</th>'
         string_output = string_output + strRW
 
     string_output = string_output + '</tr>'
 
-    precision = 3
-    for duckie in scores_bundle.keys():
-        strRW = "<tr><td>" + duckie + "</td>"
-        for rule in valid_rules:
-            strRW = strRW + '<td>' + "{:.{}f}".format(scores_bundle[duckie][rule], precision) + "</td>"
-        strRW = strRW + '</tr>'
-        string_output = string_output + strRW
+    rank = 1
+    while len(tracker.trajs_tracked.keys()) > 0:
+
+        precision = 3
+        best = tracker.pop_best()
+        for duckie in best.keys():
+            strRW = '<tr><td style="text-align:center">' + str(rank) + '</td><td style="text-align:center">' + duckie + '</td>'
+            for rule in rules_list.keys():
+                score = scores_bundle[duckie]
+                strRW = strRW + '<td style="text-align:center">' + "{:.{}f}".format(scores_bundle[duckie][rule], precision) + "</td>"
+            strRW = strRW + '</tr>'
+            string_output = string_output + strRW
+        rank += 1
 
     string_output = string_output + "</table>"
 
-    return string_output
+    return string_preamble0 + string_preamble + rules_enum + string_output
+
+
+def make_html_table2(scores_bundle):
+    rules_list = ["Survival time", "Drivable areas", "Deviation from center line"]
+    tracker = LexicographicTracker(rules_list)
+    tracker.add_collection(scores_bundle)
+    string_preamble0 = f'<p>{len(scores_bundle.keys())} trajectories were randomly generated and evaluated. The optimal trajectories are dispalyed in red.</p>'
+    string_preamble = "<p>In order to determine the optimal trajectories, the scores of the trajectories were lexicographically ordered where the following rules and thresholds were used:</p>"
+    rules_enum = '<ol>'
+    for k in rules_list:
+        entry = f'<li>{k}</li>'
+        rules_enum = rules_enum + entry
+    rules_enum = rules_enum + '</ol>'
+    string_output = '<table style="width:70%"><tr><th>Rank</th><th>Duckiebot</th>'
+
+    for rule in rules_list:
+        strRW = '<th>' + rule + '</th>'
+        string_output = string_output + strRW
+
+    string_output = string_output + '</tr>'
+
+    rank = 1
+    while len(tracker.optimal_trajs.keys()) > 0:
+
+        precision = 3
+        best = tracker.pop_best()
+        for duckie in best.keys():
+            strRW = '<tr><td style="text-align:center">' + str(rank) + '</td><td style="text-align:center">' + duckie + '</td>'
+            for rule in rules_list:
+                score = scores_bundle[duckie]
+                strRW = strRW + '<td style="text-align:center">' + "{:.{}f}".format(scores_bundle[duckie][rule], precision) + "</td>"
+            strRW = strRW + '</tr>'
+            string_output = string_output + strRW
+        rank += 1
+
+    string_output = string_output + "</table>"
+
+    return string_preamble0 + string_preamble + rules_enum + string_output
 
 
 def mime_from_fn(fn):
@@ -727,6 +783,8 @@ def data_encoded_for_src(data, mime):
 def draw_axes(drawing, g, L=0.1, stroke_width=0.01, klass='axes'):
     g2 = drawing.g()
     g2.attribs['class'] = klass
+    g3 = drawing.g()
+    g3.attribs['class'] = klass
     line = drawing.line(start=(0, 0),
                         end=(L, 0),
                         stroke_width=stroke_width,
@@ -741,6 +799,23 @@ def draw_axes(drawing, g, L=0.1, stroke_width=0.01, klass='axes'):
 
     g.add(g2)
 
+
+def draw_tags(drawing, g, L, W, name: str, klass='tags'):
+    g2 = drawing.g()
+    g2.attribs['class'] = klass
+
+    if name is not None:
+        text = drawing.text(name,
+                            insert=(-L * 0.45 , 0),
+                            stroke='none',
+                            fill='black',
+                            font_size=W * 0.5,
+                            transform="translate(0, 0) scale(1, -1)",
+                            font_weight="bold",
+                            font_family="Arial")
+        g2.add(text)
+
+        g.add(g2)
 
 
 @memoized_reset

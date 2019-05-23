@@ -195,7 +195,7 @@ def get_lane_poses(dw, q: SE2v, tol=0.000001):
             center_point_abs = np.dot(M, center_point)
             center_point_abs_t = Matrix2D(center_point_abs)
 
-            if lane_pose.along_inside and lane_pose.inside and lane_pose.correct_direction:
+            if lane_pose.along_inside and lane_pose.correct_direction: # and lane_pose.correct_direction:
                 yield GetLanePoseResult(tile=tile, tile_fqn=tile_fqn,
                                         tile_transform=tile_transform,
                                         tile_relative_pose=Matrix2D(tile_relative_pose),

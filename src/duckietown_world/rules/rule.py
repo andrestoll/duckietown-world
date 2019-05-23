@@ -108,15 +108,6 @@ class Rule(metaclass=ABCMeta):
                 result.set_violation()
         """
 
-    @abstractmethod
-    def precedes(self, score_x: float, score_y: float):
-        """ Determines in what way the scores of a rule are ordered.
-
-        :param score_x: score of trajectory x w.r.t rule
-        :param score_y: score of trajectory y w.r.t rule
-        :return: True if score of x precedes score of y
-        """
-
 
 def evaluate_rules(poses_sequence,
                    interval: SampledSequence[Timestamp],
@@ -124,7 +115,9 @@ def evaluate_rules(poses_sequence,
                    ego_name: str) -> Dict[
     str, RuleEvaluationResult]:
     from duckietown_world.world_duckietown import create_lane_highlight
+
     lane_pose_seq = create_lane_highlight(poses_sequence, world)
+
     from duckietown_world.rules import DeviationFromCenterLine
     from duckietown_world.rules import InDrivableLane
     from duckietown_world.rules import DeviationHeading
