@@ -26,7 +26,7 @@ def test_bundle():
 
     q0 = geo.SE2_from_R2(init_pose)
     v0 = geo.se2_from_linear_angular(init_vel, 0)
-    N = 10
+    N = 2
 
     trajs_bundle, commands_bundle = get_random_trajs_bundle(
         parameters, N,
@@ -60,7 +60,7 @@ def visualize(commands_bundle, trajs_bundle, outdir):
         else:
             root.set_object(ego_name, DB19(name=id_try), ground_truth=ground_truth)
 
-        # update_timeseries(timeseries, ego_name, commands, traj)
+        update_timeseries(timeseries, ego_name, commands, traj)
 
     draw_static(root, outdir, timeseries=timeseries, scores=scores_bundle)
 

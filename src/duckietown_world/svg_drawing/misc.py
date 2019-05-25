@@ -1,26 +1,27 @@
 # coding=utf-8
 import base64
-from dataclasses import dataclass
-from typing import *
 import itertools
 import logging
 import math
 import os
 from collections import OrderedDict
+from dataclasses import dataclass
+from typing import *
 from typing import Optional
 
 import svgwrite
+from PIL import Image
 from bs4 import Tag, BeautifulSoup
+from contracts import contract, check_isinstance
 from past.builtins import reduce
 from six import BytesIO
 
-from contracts import contract, check_isinstance
 from duckietown_world import logger
 from duckietown_world.geo import RectangularArea, get_extent_points, get_static_and_dynamic
+from duckietown_world.optimization import LexicographicSemiorderTracker, LexicographicTracker
 from duckietown_world.seqs import SampledSequence, UndefinedAtTime
 from duckietown_world.seqs.tsequence import Timestamp
 from duckietown_world.utils import memoized_reset
-from duckietown_world.optimization import LexicographicSemiorderTracker, LexicographicTracker, ProductOrderTracker
 
 __all__ = [
     'draw_recursive',
@@ -101,7 +102,7 @@ def draw_children(drawing, po, g, draw_list=()):
         transforms = [_ for _ in po.spatial_relations.values() if _.a == () and _.b == (child_name,)]
         if transforms:
 
-            rlist = recurive_draw_list(draw_list, child_name)
+            rlist = recursive_draw_list(draw_list, child_name)
 
             if rlist:
                 M = transforms[0].transform.asmatrix2d().m
@@ -124,7 +125,7 @@ def get_typenames_for_class(ob):
     return names
 
 
-def recurive_draw_list(draw_list, prefix):
+def recursive_draw_list(draw_list, prefix):
     res = []
     for _ in draw_list:
         if _ and _[0] == prefix:
@@ -184,6 +185,7 @@ def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
         obs_div.append(imagename2div[name])
 
     # logger.debug('dynamic: %s' % dynamic)
+    svg_as_images = []
     for i, t in keyframes:
         g_t = drawing.g()
         g_t.attribs['class'] = 'keyframe keyframe%d' % i
@@ -191,6 +193,26 @@ def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
         root_t = root.filter_all(ChooseTime(t))
 
         draw_recursive(drawing, root_t, g_t, draw_list=dynamic)
+
+        # drawing of current position
+        fn_svg_t = os.path.join(output_dir, f'drawing{i}.svg')
+        drawing_t, base_t = get_basic_upright2(fn_svg_t, area, pixel_size)
+
+        gmg_t = drawing_t.g()
+        base_t.add(gmg_t)
+        base_t.add(g_static)
+
+        draw_recursive(drawing_t, root_t0, g_static, draw_list=static)
+        draw_recursive(drawing_t, root_t, g_t, draw_list=dynamic)
+
+        base_t.add(g_t)
+
+        drawing_t.saveas(fn_svg_t)
+        image_file = convert_with_cairosvg_simple(fn_svg_t)
+        im = Image.open(image_file)
+        svg_as_images.append(im)
+
+        os.remove(fn_svg_t)
         base.add(g_t)
 
         for name, sequence in images.items():
@@ -217,6 +239,18 @@ def draw_static(root, output_dir, pixel_size=(480, 480), area=None, images=None,
             imagename2div[name].append(img)
 
     other = ""
+
+    svg_as_images[0].save('animation.gif',
+                          save_all=True,
+                          append_images=svg_as_images[1:],
+                          duration=100,
+                          loop=0)
+
+    dir_list = os.listdir(output_dir)
+
+    # for item in dir_list:
+    #     if item.endswith(".png"):
+    #         os.remove(os.path.join(output_dir, item))
 
     if scores:
         other = make_html_table2(scores)
@@ -359,11 +393,13 @@ def get_resized_image(bytes_content, width):
     image.save(out, format='jpeg')
     return out.getvalue()
 
+
 @dataclass
 class TimeseriesPlot:
     title: str
     long_description: Optional[str]
     sequences: Dict
+
     # def __init__(self, title, long_description, sequences):
     #     check_isinstance(title, six.string_types)
     #     self.title = title
@@ -404,10 +440,10 @@ def make_tabs(timeseries):
             assert isinstance(sequence, SampledSequence)
 
             trace = go.Scatter(
-                    x=sequence.timestamps,
-                    y=sequence.values,
-                    mode='lines+markers',
-                    name=name_sequence,
+                x=sequence.timestamps,
+                y=sequence.values,
+                mode='lines+markers',
+                name=name_sequence,
             )
             scatters.append(trace)
 
@@ -683,7 +719,7 @@ body {{
 
 
 def make_html_table(scores_bundle):
-    # TODO rules_list as input
+    #  TODO rules_list as input
     # generic for each tracker
     rules_list = {"Survival time": 0.5, "Drivable areas": 0.5, "Deviation from center line": 0.1}
     tracker = LexicographicSemiorderTracker(rules_list)
@@ -691,7 +727,7 @@ def make_html_table(scores_bundle):
     string_preamble0 = f'<p>{len(scores_bundle.keys())} were randomly generated and evaluated. The optimal trajectories are dispalyed in red.</p>'
     string_preamble = "<p>In order to determine the optimal trajectories, the scores of the trajectories were lexicographically semiordered where the following rules and thresholds were used:</p>"
     rules_enum = '<ol>'
-    for k,v in rules_list.items():
+    for k, v in rules_list.items():
         entry = f'<li>{k} (threshold: {v})</li>'
         rules_enum = rules_enum + entry
     rules_enum = rules_enum + '</ol>'
@@ -709,10 +745,12 @@ def make_html_table(scores_bundle):
         precision = 3
         best = tracker.pop_best()
         for duckie in best.keys():
-            strRW = '<tr><td style="text-align:center">' + str(rank) + '</td><td style="text-align:center">' + duckie + '</td>'
+            strRW = '<tr><td style="text-align:center">' + str(
+                rank) + '</td><td style="text-align:center">' + duckie + '</td>'
             for rule in rules_list.keys():
                 score = scores_bundle[duckie]
-                strRW = strRW + '<td style="text-align:center">' + "{:.{}f}".format(scores_bundle[duckie][rule], precision) + "</td>"
+                strRW = strRW + '<td style="text-align:center">' + "{:.{}f}".format(scores_bundle[duckie][rule],
+                                                                                    precision) + "</td>"
             strRW = strRW + '</tr>'
             string_output = string_output + strRW
         rank += 1
@@ -747,10 +785,12 @@ def make_html_table2(scores_bundle):
         precision = 3
         best = tracker.pop_best()
         for duckie in best.keys():
-            strRW = '<tr><td style="text-align:center">' + str(rank) + '</td><td style="text-align:center">' + duckie + '</td>'
+            strRW = '<tr><td style="text-align:center">' + str(
+                rank) + '</td><td style="text-align:center">' + duckie + '</td>'
             for rule in rules_list:
                 score = scores_bundle[duckie]
-                strRW = strRW + '<td style="text-align:center">' + "{:.{}f}".format(scores_bundle[duckie][rule], precision) + "</td>"
+                strRW = strRW + '<td style="text-align:center">' + "{:.{}f}".format(scores_bundle[duckie][rule],
+                                                                                    precision) + "</td>"
             strRW = strRW + '</tr>'
             string_output = string_output + strRW
         rank += 1
@@ -806,7 +846,7 @@ def draw_tags(drawing, g, L, W, name: str, klass='tags'):
 
     if name is not None:
         text = drawing.text(name,
-                            insert=(-L * 0.45 , 0),
+                            insert=(-L * 0.45, 0),
                             stroke='none',
                             fill='black',
                             font_size=W * 0.5,
@@ -854,3 +894,10 @@ def get_markdown(md: str) -> str:
 
     res = bs(html)
     return res
+
+
+def convert_with_cairosvg_simple(file):
+    # import cairocffi as cairo
+    from cairosvg import svg2png
+    svg2png(url=file, write_to=file[:-4] + '.png', output_width=480, output_height=480)
+    return file[:-4] + '.png'

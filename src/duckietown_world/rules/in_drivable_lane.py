@@ -74,7 +74,7 @@ class SurvivalTime(Rule):
             except UndefinedAtTime:
                 d = 0.0
             else:
-                if name2lpr:
+                if name2lpr and (timestamp != 0.0):
                     d = 1.0
                 else:
                     # no lp
@@ -209,16 +209,13 @@ class InDrivableLane(Rule):
             except UndefinedAtTime:
                 d = 0.0
             else:
+                lateral_inside = True
                 for k, lpr in name2lpr.items():
                     assert isinstance(lpr, GetLanePoseResult)
                     lane_pose = lpr.lane_pose
                     lateral_inside = lane_pose.lateral_inside
 
-                if lateral_inside:
-                    d = 1.0
-                else:
-                    # no lp
-                    d = 0.0
+                d = 1.0 if lateral_inside and (timestamp != 0.0) else 0.0
 
             values.append(d)
             timestamps.append(timestamp)
@@ -244,9 +241,6 @@ class InDrivableLane(Rule):
 
 
 class DrivenLength(Rule):
-
-    def precedes(self, x, y):
-        return x > y
 
     def evaluate(self, context: RuleEvaluationContext, result: RuleEvaluationResult):
         interval = context.get_interval()
@@ -331,9 +325,6 @@ class DrivenLength(Rule):
 
 
 class DrivenLengthConsecutive(Rule):
-
-    def precedes(self, x, y):
-        return x > y
 
     def evaluate(self, context: RuleEvaluationContext, result: RuleEvaluationResult):
         interval = context.get_interval()
