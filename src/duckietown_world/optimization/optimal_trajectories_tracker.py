@@ -173,9 +173,10 @@ class LexicographicSemiorderTracker(OptimalTrajectoryTracker):
             else:
                 optimal_score = max(optimal_set.values(), key=lambda x: x[rule])[rule]
             # print("Optimal score for ", rule, optimal_score)
-            optimal_set = {k: v for k, v in optimal_set.items() if not strictly_precedes(rule, optimal_score, v[rule], slack)}
+            optimal_set = {k: v for k, v in optimal_set.items() if
+                           not strictly_precedes(rule, optimal_score, v[rule], slack)}
             # for item in optimal_set:
-                # print(item, ":", optimal_set[item][rule])
+            # print(item, ":", optimal_set[item][rule])
         return optimal_set
 
     def pop_best(self):
@@ -260,9 +261,9 @@ class ProductOrderTracker(OptimalTrajectoryTracker):
         for item in self.trajs_tracked:
             item_scores = self.trajs_tracked[item]
 
-            if self.compare(item_scores, scores):
+            if self.compare_scores(item_scores, scores):
                 return
-            elif self.compare(scores, item_scores):
+            elif self.compare_scores(scores, item_scores):
                 filter_index.append(item)
 
         self.trajs_tracked = {k: v for k, v in self.trajs_tracked.items() if k not in filter_index}

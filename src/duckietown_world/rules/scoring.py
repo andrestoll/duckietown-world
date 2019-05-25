@@ -17,11 +17,6 @@ def get_scores(evaluated: Dict[str, RuleEvaluationResult]) -> Dict[str, float]:
 
         for km, evaluated_metric in rer.metrics.items():
             scores[evaluated_metric.title] = evaluated_metric.total
-            # print(evaluated_metric.title)
-            # print(evaluated_metric.incremental)
-            # print(evaluated_metric.cumulative)
-            # print("------------------------")
-
 
     return scores
 
@@ -39,7 +34,7 @@ def get_scores_of_traj_bundle(world: PlacedObject,
     :param vehicle: Vehicle parameters
     :return: Scores bundle of input trajectory bundle
     """
-    # TODO make commands obsolete
+
     scores_of_traj_bundle = {}
 
     for id_try, commands in commands_bundle.items():
