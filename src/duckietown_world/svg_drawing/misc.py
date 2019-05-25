@@ -742,7 +742,7 @@ def make_html_table2(scores_bundle):
     string_output = string_output + '</tr>'
 
     rank = 1
-    while len(tracker.optimal_trajs.keys()) > 0:
+    while len(tracker.trajs_tracked.keys()) > 0:
 
         precision = 3
         best = tracker.pop_best()

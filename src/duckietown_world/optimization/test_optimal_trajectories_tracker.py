@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from collections import OrderedDict
-from .optimal_trajectories_tracker import LexicographicSemiorderTracker, assert_valid_rules
+from .optimal_trajectories_tracker import LexicographicSemiorderTracker, assert_valid_rules, ProductOrderTracker
 
 
 class LexicographicSemiorderTest(unittest.TestCase):
@@ -45,6 +45,25 @@ class LexicographicSemiorderTest(unittest.TestCase):
         optimal_set = optimal_tracker.get_optimal_trajs().keys()
         self.assertTrue("traj1" in optimal_set)
         self.assertTrue("traj2" not in optimal_set)
+
+    def testProductOrder(self):
+        rules_list = ["Drivable areas", "Survival time"]
+        optimal_tracker = ProductOrderTracker(rules_list)
+        scores1 = {"Drivable areas": 0.7, "Survival time": 0.8}
+        scores2 = {"Drivable areas": 0.5, "Survival time": 0.4}
+        scores3 = {"Drivable areas": 0.9, "Survival time": 0.7}
+        scores4 = {"Drivable areas": 0.7, "Survival time": 0.8}
+        optimal_tracker.digest_traj("traj1", scores1)
+        optimal_tracker.digest_traj("traj2", scores2)
+        optimal_set = optimal_tracker.get_optimal_trajs().keys()
+        self.assertTrue("traj1" in optimal_set)
+        self.assertTrue("traj2" not in optimal_set)
+        optimal_tracker.digest_traj("traj3", scores3)
+        optimal_tracker.digest_traj("traj4", scores4)
+        optimal_set = optimal_tracker.get_optimal_trajs().keys()
+        self.assertTrue("traj1" in optimal_set)
+        self.assertTrue("traj3" in optimal_set)
+        self.assertTrue("traj4" in optimal_set)
 
 
 if __name__ == "__main__":
